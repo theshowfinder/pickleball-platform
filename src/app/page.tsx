@@ -4,8 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { fallbackSessions, type Session } from "@/lib/sessions";
 
+type VenueSummary = { id: string; name: string; area: string | null; postcode: string | null };
+
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>(fallbackSessions);
+  const [venues, setVenues] = useState<VenueSummary[]>([]);
   const [dataMode, setDataMode] = useState<"sample" | "supabase">("sample");
   const [connectionState, setConnectionState] = useState<"checking" | "live" | "error" | "not-configured">("checking");
   const [level, setLevel] = useState("Any level");
@@ -31,7 +34,8 @@ export default function Home() {
     void Promise.all([
       supabase.from("sessions").select("id, title, venue_id, starts_at, skill_level, session_type, price_pence, availability_text, source_name, source_url").eq("status", "published").order("starts_at", { ascending: true }).limit(100),
       supabase.from("venues").select("id, name, area, booking_url"),
-    ]).then(([sessionResult, venueResult]) => {
+      supabase.from("venues").select("id, name, area, postcode").eq("area", "West London").order("name"),
+    ]).then(([sessionResult, venueResult, summaryResult]) => {
         if (!active) return;
         if (sessionResult.error || venueResult.error) {
           console.error("Supabase session query failed", sessionResult.error ?? venueResult.error);
@@ -43,6 +47,7 @@ export default function Home() {
           return;
         }
         const venues = new Map((venueResult.data ?? []).map((venue) => [venue.id, venue]));
+        setVenues(summaryResult.data ?? []);
         const mapped = sessionResult.data.map((row) => {
           const venue = venues.get(row.venue_id);
           const startsAt = new Date(row.starts_at);
@@ -104,6 +109,7 @@ export default function Home() {
         <div className="filters"><label><span>When</span><button className="filter-control">This week <b>⌄</b></button></label><label><span>Where</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>All London</option><option>West London</option><option>Central London</option><option>South London</option></select></label><label><span>Level</span><select value={level} onChange={(event) => setLevel(event.target.value)}><option>Any level</option><option>Beginner</option><option>Improver</option><option>Intermediate</option><option>Advanced</option></select></label><button className="filter-button">Find sessions <span>→</span></button></div>
         <div className="results-head"><strong>{filtered.length} sessions found</strong><span>{dataMode === "supabase" ? "Live from your Supabase database · " : connectionState === "error" ? "Database connection error · " : connectionState === "not-configured" ? "Supabase not configured · " : "Loading live data · "}<button>Best match ⌄</button></span></div>
         <div className="session-grid">{filtered.map((session) => <article className="session-card" key={`${session.venue}-${session.time}`}><div className={`session-art ${session.tone}`}><span className="art-type">{session.type}</span><span className="art-time">{session.time}</span><div className="art-court"><span /><span /><span /><span /></div><div className="art-ball">●</div></div><div className="session-body"><div className="session-meta"><span>{session.date}</span><span>·</span><span>{session.level}</span></div><h3><a className="session-link" href={session.venueId ? `/venues/${session.venueId}` : "#sessions"}>{session.title}</a></h3><p><a className="venue-link" href={session.venueId ? `/venues/${session.venueId}` : "#sessions"}>{session.venue}</a> <span>·</span> {session.area}</p><div className="session-foot"><strong>{session.price}</strong><span className="availability">● {session.status}</span><span className="source">{session.source}</span></div><button className="book-button" onClick={() => void bookSession(session)} disabled={!session.bookingUrl}>{session.bookingUrl ? session.bookingLabel ?? "Book session →" : "Booking link coming soon"}</button></div></article>)}</div>
+        {venues.length > 0 && <div className="venue-directory"><div className="section-kicker">WEST LONDON VENUES</div><div className="venue-directory-heading"><h2>Places to play</h2><p>Verified venues, even when their live timetable is managed elsewhere.</p></div><div className="venue-grid">{venues.map((venue) => <a className="venue-directory-card" href={`/venues/${venue.id}`} key={venue.id}><span className="venue-directory-label">Venue & organiser</span><strong>{venue.name}</strong><small>{venue.area}{venue.postcode ? ` · ${venue.postcode}` : ""}</small><span className="venue-directory-arrow">View venue →</span></a>)}</div></div>}
       </div></section>
 
       <section className="how shell" id="how"><div className="section-kicker">A BETTER WAY TO PLAY</div><h2>Less time searching.<br /><em>More time on court.</em></h2><div className="how-grid"><div><span className="step">01</span><h3>Tell us what fits</h3><p>Set your area, level and when you like to play. We remember the details.</p></div><div><span className="step">02</span><h3>See it all together</h3><p>One clear view across clubs, socials, coaching and matchplay.</p></div><div><span className="step">03</span><h3>Get out and play</h3><p>Book with the organiser, or let us alert you when the right spot opens.</p></div></div></section>
