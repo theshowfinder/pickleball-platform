@@ -12,6 +12,14 @@ export default function Home() {
   const [area, setArea] = useState("All London");
   const [saved, setSaved] = useState(false);
 
+  async function bookSession(session: Session) {
+    const supabase = createSupabaseBrowserClient();
+    if (supabase && !session.id.startsWith("sample-")) {
+      await supabase.from("booking_clicks").insert({ session_id: session.id, source_name: session.source });
+    }
+    if (session.bookingUrl) window.open(session.bookingUrl, "_blank", "noopener,noreferrer");
+  }
+
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     if (!supabase) {
@@ -22,7 +30,7 @@ export default function Home() {
     let active = true;
     void supabase
       .from("sessions")
-      .select("id, title, starts_at, skill_level, session_type, price_pence, availability_text, source_name, venues(name, area)")
+      .select("id, title, starts_at, skill_level, session_type, price_pence, availability_text, source_name, source_url, venues(name, area, booking_url)")
       .eq("status", "published")
       .order("starts_at", { ascending: true })
       .limit(24)
@@ -52,6 +60,7 @@ export default function Home() {
             price: row.price_pence == null ? "Free" : `£${(row.price_pence / 100).toFixed(0)}`,
             status: row.availability_text ?? "Booking open",
             source: row.source_name,
+            bookingUrl: row.source_url ?? venue?.booking_url,
             tone: fallbackSessions.find((sample) => sample.type === row.session_type)?.tone ?? "mint",
           } satisfies Session;
         });
@@ -94,7 +103,7 @@ export default function Home() {
       <section className="search-section" id="sessions"><div className="shell"><div className="section-kicker">FIND YOUR FIT</div><div className="section-heading"><div><h2>What are you looking for?</h2><p>Live options from venues and organisers across London.</p></div><button className={`save-search ${saved ? "active" : ""}`} onClick={() => setSaved(!saved)}>{saved ? "✓ Alert saved" : "♡ Save this search"}</button></div>
         <div className="filters"><label><span>When</span><button className="filter-control">This week <b>⌄</b></button></label><label><span>Where</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>All London</option><option>West London</option><option>Central London</option><option>South London</option></select></label><label><span>Level</span><select value={level} onChange={(event) => setLevel(event.target.value)}><option>Any level</option><option>Beginner</option><option>Improver</option><option>Intermediate</option><option>Advanced</option></select></label><button className="filter-button">Find sessions <span>→</span></button></div>
         <div className="results-head"><strong>{filtered.length} sessions found</strong><span>{dataMode === "supabase" ? "Live from your Supabase database · " : connectionState === "error" ? "Database connection error · " : connectionState === "not-configured" ? "Supabase not configured · " : "Loading live data · "}<button>Best match ⌄</button></span></div>
-        <div className="session-grid">{filtered.map((session) => <article className="session-card" key={`${session.venue}-${session.time}`}><div className={`session-art ${session.tone}`}><span className="art-type">{session.type}</span><span className="art-time">{session.time}</span><div className="art-court"><span /><span /><span /><span /></div><div className="art-ball">●</div></div><div className="session-body"><div className="session-meta"><span>{session.date}</span><span>·</span><span>{session.level}</span></div><h3>{session.title}</h3><p>{session.venue} <span>·</span> {session.area}</p><div className="session-foot"><strong>{session.price}</strong><span className="availability">● {session.status}</span><span className="source">{session.source}</span></div></div></article>)}</div>
+        <div className="session-grid">{filtered.map((session) => <article className="session-card" key={`${session.venue}-${session.time}`}><div className={`session-art ${session.tone}`}><span className="art-type">{session.type}</span><span className="art-time">{session.time}</span><div className="art-court"><span /><span /><span /><span /></div><div className="art-ball">●</div></div><div className="session-body"><div className="session-meta"><span>{session.date}</span><span>·</span><span>{session.level}</span></div><h3>{session.title}</h3><p>{session.venue} <span>·</span> {session.area}</p><div className="session-foot"><strong>{session.price}</strong><span className="availability">● {session.status}</span><span className="source">{session.source}</span></div><button className="book-button" onClick={() => void bookSession(session)} disabled={!session.bookingUrl}>{session.bookingUrl ? "Book session →" : "Booking link coming soon"}</button></div></article>)}</div>
       </div></section>
 
       <section className="how shell" id="how"><div className="section-kicker">A BETTER WAY TO PLAY</div><h2>Less time searching.<br /><em>More time on court.</em></h2><div className="how-grid"><div><span className="step">01</span><h3>Tell us what fits</h3><p>Set your area, level and when you like to play. We remember the details.</p></div><div><span className="step">02</span><h3>See it all together</h3><p>One clear view across clubs, socials, coaching and matchplay.</p></div><div><span className="step">03</span><h3>Get out and play</h3><p>Book with the organiser, or let us alert you when the right spot opens.</p></div></div></section>
