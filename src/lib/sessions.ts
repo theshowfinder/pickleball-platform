@@ -10,6 +10,7 @@ export type Session = {
   price: string;
   status: string;
   source: string;
+  bookingLabel?: string;
   bookingUrl?: string;
   tone: string;
 };
