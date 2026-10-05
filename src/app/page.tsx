@@ -7,13 +7,17 @@ import { fallbackSessions, type Session } from "@/lib/sessions";
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>(fallbackSessions);
   const [dataMode, setDataMode] = useState<"sample" | "supabase">("sample");
+  const [connectionState, setConnectionState] = useState<"checking" | "live" | "error" | "not-configured">("checking");
   const [level, setLevel] = useState("Any level");
   const [area, setArea] = useState("All London");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setConnectionState("not-configured");
+      return;
+    }
 
     let active = true;
     void supabase
@@ -23,7 +27,16 @@ export default function Home() {
       .order("starts_at", { ascending: true })
       .limit(24)
       .then(({ data, error }) => {
-        if (!active || error || !data?.length) return;
+        if (!active) return;
+        if (error) {
+          console.error("Supabase session query failed", error);
+          setConnectionState("error");
+          return;
+        }
+        if (!data?.length) {
+          setConnectionState("live");
+          return;
+        }
         const mapped = data.map((row) => {
           const venue = Array.isArray(row.venues) ? row.venues[0] : row.venues;
           const startsAt = new Date(row.starts_at);
@@ -44,6 +57,7 @@ export default function Home() {
         });
         setSessions(mapped);
         setDataMode("supabase");
+        setConnectionState("live");
       });
 
     return () => { active = false; };
@@ -79,7 +93,7 @@ export default function Home() {
 
       <section className="search-section" id="sessions"><div className="shell"><div className="section-kicker">FIND YOUR FIT</div><div className="section-heading"><div><h2>What are you looking for?</h2><p>Live options from venues and organisers across London.</p></div><button className={`save-search ${saved ? "active" : ""}`} onClick={() => setSaved(!saved)}>{saved ? "✓ Alert saved" : "♡ Save this search"}</button></div>
         <div className="filters"><label><span>When</span><button className="filter-control">This week <b>⌄</b></button></label><label><span>Where</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>All London</option><option>West London</option><option>Central London</option><option>South London</option></select></label><label><span>Level</span><select value={level} onChange={(event) => setLevel(event.target.value)}><option>Any level</option><option>Beginner</option><option>Improver</option><option>Intermediate</option><option>Advanced</option></select></label><button className="filter-button">Find sessions <span>→</span></button></div>
-        <div className="results-head"><strong>{filtered.length} sessions found</strong><span>{dataMode === "supabase" ? "Live from your Supabase database · " : "Preview data · "}<button>Best match ⌄</button></span></div>
+        <div className="results-head"><strong>{filtered.length} sessions found</strong><span>{dataMode === "supabase" ? "Live from your Supabase database · " : connectionState === "error" ? "Database connection error · " : connectionState === "not-configured" ? "Supabase not configured · " : "Loading live data · "}<button>Best match ⌄</button></span></div>
         <div className="session-grid">{filtered.map((session) => <article className="session-card" key={`${session.venue}-${session.time}`}><div className={`session-art ${session.tone}`}><span className="art-type">{session.type}</span><span className="art-time">{session.time}</span><div className="art-court"><span /><span /><span /><span /></div><div className="art-ball">●</div></div><div className="session-body"><div className="session-meta"><span>{session.date}</span><span>·</span><span>{session.level}</span></div><h3>{session.title}</h3><p>{session.venue} <span>·</span> {session.area}</p><div className="session-foot"><strong>{session.price}</strong><span className="availability">● {session.status}</span><span className="source">{session.source}</span></div></div></article>)}</div>
       </div></section>
 
