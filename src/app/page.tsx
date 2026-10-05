@@ -28,25 +28,23 @@ export default function Home() {
     }
 
     let active = true;
-    void supabase
-      .from("sessions")
-      .select("id, title, starts_at, skill_level, session_type, price_pence, availability_text, source_name, source_url, venues(name, area, booking_url)")
-      .eq("status", "published")
-      .order("starts_at", { ascending: true })
-      .limit(24)
-      .then(({ data, error }) => {
+    void Promise.all([
+      supabase.from("sessions").select("id, title, venue_id, starts_at, skill_level, session_type, price_pence, availability_text, source_name, source_url").eq("status", "published").order("starts_at", { ascending: true }).limit(100),
+      supabase.from("venues").select("id, name, area, booking_url"),
+    ]).then(([sessionResult, venueResult]) => {
         if (!active) return;
-        if (error) {
-          console.error("Supabase session query failed", error);
+        if (sessionResult.error || venueResult.error) {
+          console.error("Supabase session query failed", sessionResult.error ?? venueResult.error);
           setConnectionState("error");
           return;
         }
-        if (!data?.length) {
+        if (!sessionResult.data?.length) {
           setConnectionState("live");
           return;
         }
-        const mapped = data.map((row) => {
-          const venue = Array.isArray(row.venues) ? row.venues[0] : row.venues;
+        const venues = new Map((venueResult.data ?? []).map((venue) => [venue.id, venue]));
+        const mapped = sessionResult.data.map((row) => {
+          const venue = venues.get(row.venue_id);
           const startsAt = new Date(row.starts_at);
           return {
             id: row.id,
