@@ -1,32 +1,53 @@
 "use client";
 
-import { useMemo, useState } from "react";
-
-type Session = {
-  title: string;
-  venue: string;
-  area: string;
-  time: string;
-  date: string;
-  level: string;
-  type: string;
-  price: string;
-  status: string;
-  source: string;
-  tone: string;
-};
-
-const sessions: Session[] = [
-  { title: "Improver open play", venue: "Park Sports Chiswick", area: "West London", time: "18:30", date: "Today", level: "Improver", type: "Open play", price: "£15", status: "Spaces available", source: "ClubSpark", tone: "mint" },
-  { title: "Intermediate social", venue: "Pickleball Social", area: "Bermondsey", time: "19:00", date: "Today", level: "Intermediate", type: "Social", price: "£16", status: "Booking open", source: "Bookwhen", tone: "peach" },
-  { title: "Beginner friendly session", venue: "Somers Town Sports Centre", area: "Central London", time: "10:00", date: "Tomorrow", level: "Beginner", type: "Social", price: "£8", status: "8 spaces left", source: "ClubSpark", tone: "lavender" },
-  { title: "Advanced matchplay", venue: "Lemon Pickleball", area: "South London", time: "20:00", date: "Thursday", level: "Advanced", type: "Matchplay", price: "£14", status: "Booking open", source: "Direct", tone: "sky" },
-];
+import { useEffect, useMemo, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fallbackSessions, type Session } from "@/lib/sessions";
 
 export default function Home() {
+  const [sessions, setSessions] = useState<Session[]>(fallbackSessions);
+  const [dataMode, setDataMode] = useState<"sample" | "supabase">("sample");
   const [level, setLevel] = useState("Any level");
   const [area, setArea] = useState("All London");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) return;
+
+    let active = true;
+    void supabase
+      .from("sessions")
+      .select("id, title, starts_at, skill_level, session_type, price_pence, availability_text, source_name, venues(name, area)")
+      .eq("status", "published")
+      .order("starts_at", { ascending: true })
+      .limit(24)
+      .then(({ data, error }) => {
+        if (!active || error || !data?.length) return;
+        const mapped = data.map((row) => {
+          const venue = Array.isArray(row.venues) ? row.venues[0] : row.venues;
+          const startsAt = new Date(row.starts_at);
+          return {
+            id: row.id,
+            title: row.title,
+            venue: venue?.name ?? "London venue",
+            area: venue?.area ?? "London",
+            time: startsAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+            date: startsAt.toLocaleDateString("en-GB", { weekday: "long" }),
+            level: row.skill_level,
+            type: row.session_type,
+            price: row.price_pence == null ? "Free" : `£${(row.price_pence / 100).toFixed(0)}`,
+            status: row.availability_text ?? "Booking open",
+            source: row.source_name,
+            tone: fallbackSessions.find((sample) => sample.type === row.session_type)?.tone ?? "mint",
+          } satisfies Session;
+        });
+        setSessions(mapped);
+        setDataMode("supabase");
+      });
+
+    return () => { active = false; };
+  }, []);
 
   const filtered = useMemo(() => sessions.filter((session) => {
     const levelMatch = level === "Any level" || session.level === level;
@@ -58,7 +79,7 @@ export default function Home() {
 
       <section className="search-section" id="sessions"><div className="shell"><div className="section-kicker">FIND YOUR FIT</div><div className="section-heading"><div><h2>What are you looking for?</h2><p>Live options from venues and organisers across London.</p></div><button className={`save-search ${saved ? "active" : ""}`} onClick={() => setSaved(!saved)}>{saved ? "✓ Alert saved" : "♡ Save this search"}</button></div>
         <div className="filters"><label><span>When</span><button className="filter-control">This week <b>⌄</b></button></label><label><span>Where</span><select value={area} onChange={(event) => setArea(event.target.value)}><option>All London</option><option>West London</option><option>Central London</option><option>South London</option></select></label><label><span>Level</span><select value={level} onChange={(event) => setLevel(event.target.value)}><option>Any level</option><option>Beginner</option><option>Improver</option><option>Intermediate</option><option>Advanced</option></select></label><button className="filter-button">Find sessions <span>→</span></button></div>
-        <div className="results-head"><strong>{filtered.length} sessions found</strong><span>Updated just now · <button>Best match ⌄</button></span></div>
+        <div className="results-head"><strong>{filtered.length} sessions found</strong><span>{dataMode === "supabase" ? "Live from your Supabase database · " : "Preview data · "}<button>Best match ⌄</button></span></div>
         <div className="session-grid">{filtered.map((session) => <article className="session-card" key={`${session.venue}-${session.time}`}><div className={`session-art ${session.tone}`}><span className="art-type">{session.type}</span><span className="art-time">{session.time}</span><div className="art-court"><span /><span /><span /><span /></div><div className="art-ball">●</div></div><div className="session-body"><div className="session-meta"><span>{session.date}</span><span>·</span><span>{session.level}</span></div><h3>{session.title}</h3><p>{session.venue} <span>·</span> {session.area}</p><div className="session-foot"><strong>{session.price}</strong><span className="availability">● {session.status}</span><span className="source">{session.source}</span></div></div></article>)}</div>
       </div></section>
 
