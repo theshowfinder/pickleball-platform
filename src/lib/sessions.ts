@@ -1,5 +1,6 @@
 export type Session = {
   id: string;
+  venueId?: string;
   title: string;
   venue: string;
   area: string;
