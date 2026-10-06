@@ -33,8 +33,20 @@ export async function fetchBookwhenRecords(limit = 250) {
   let nextUrl: string | undefined = BOOKWHEN_EVENTS_URL;
 
   while (nextUrl && records.length < limit) {
-    const response = await fetch(nextUrl, { headers: { accept: "application/json" }, cache: "no-store" });
-    if (!response.ok) throw new Error(`Bookwhen returned ${response.status}`);
+    const response = await fetch(nextUrl, {
+      headers: {
+        accept: "application/json",
+        "user-agent": "Rally Pickleball Hub/0.1 (+https://pickleball-platform-xi.vercel.app/)",
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("retry-after");
+        throw new Error(`Bookwhen rate limited (429)${retryAfter ? `; retry-after ${retryAfter}` : ""}`);
+      }
+      throw new Error(`Bookwhen returned ${response.status}`);
+    }
     const payload = await response.json() as BookwhenResponse;
     for (const item of payload.items ?? []) {
       if (!isPickleball(item)) continue;
