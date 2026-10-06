@@ -7,6 +7,10 @@
     {
       "path": "/api/ingest/openactive",
       "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/discover/openactive",
+      "schedule": "30 */6 * * *"
     }
   ]
 }
