@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (!authorised(request)) return Response.json({ error: "Unauthorised" }, { status: 401 });
   const supabase = createSupabaseServerClient();
   if (!supabase) return Response.json({ error: "Server Supabase configuration is missing" }, { status: 500 });
-  const limit = Math.min(Number(new URL(request.url).searchParams.get("limit") || 25), 50);
+  const limit = Math.min(Number(new URL(request.url).searchParams.get("limit") || 5), 5);
   const { data: connectors, error } = await supabase.from("source_connectors").select("id, source_url, config").eq("provider", "OpenActive discovered").eq("active", true).order("last_attempted_at", { ascending: true, nullsFirst: true }).limit(limit);
   if (error) return Response.json({ error: error.message }, { status: 500 });
   let feedsChecked = 0; let sessionsCreated = 0; let sessionsUpdated = 0; let feedsFailed = 0;
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     try {
       const config = connector.config && typeof connector.config === "object" ? connector.config as Record<string, unknown> : {};
       const startUrl = typeof config.nextUrl === "string" ? config.nextUrl : connector.source_url;
-      const fetched = await fetchOpenActiveRecords(startUrl, 50);
+      const fetched = await fetchOpenActiveRecords(startUrl, 50, 1);
       let created = 0; let updated = 0;
       for (const rawRecord of fetched.records) {
         const session = normalizeOpenActiveRecord(rawRecord); if (!session) continue;

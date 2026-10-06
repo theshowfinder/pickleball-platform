@@ -27,12 +27,15 @@ function isPickleball(item: Record<string, unknown>) {
   ]).toLowerCase().includes("pickleball");
 }
 
-export async function fetchOpenActiveRecords(startUrl = OPENACTIVE_LONDON_SPORT_URL, limit = 250) {
+export async function fetchOpenActiveRecords(startUrl = OPENACTIVE_LONDON_SPORT_URL, limit = 250, maxPages = 20) {
   const records: RawSourceRecord[] = [];
   let nextUrl: string | undefined = startUrl;
+  let pages = 0;
   while (nextUrl && records.length < limit) {
+    if (pages >= maxPages) break;
+    pages += 1;
     const currentUrl: string = nextUrl;
-    const response = await fetch(currentUrl, { headers: { accept: "application/json", "user-agent": "Rally Pickleball Hub/0.1 (+https://pickleball-platform-xi.vercel.app/)" }, cache: "no-store" });
+    const response = await fetch(currentUrl, { headers: { accept: "application/json", "user-agent": "Rally Pickleball Hub/0.1 (+https://pickleball-platform-xi.vercel.app/)" }, cache: "no-store", signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error(`OpenActive returned ${response.status}`);
     const page = await response.json() as RpdePage;
     for (const item of page.items ?? []) {
