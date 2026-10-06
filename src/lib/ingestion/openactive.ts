@@ -1,7 +1,7 @@
 import type { AvailabilityStatus, NormalizedSession, RawSourceRecord } from "./types";
 import { availabilityLabel } from "./normalize";
 
-export const OPENACTIVE_LONDON_SPORT_URL = "https://opensessions.io/api/Session/GetSessionsForOpenActive";
+export const OPENACTIVE_LONDON_SPORT_URL = "https://opensessions.io/api/rpde/events";
 
 type RpdeItem = { id?: string; data?: Record<string, unknown>; [key: string]: unknown };
 type RpdePage = { items?: RpdeItem[]; next?: string };
