@@ -28,11 +28,13 @@ function statusFor(spacesRemaining?: number): AvailabilityStatus {
   return "live";
 }
 
-export async function fetchBookwhenRecords(limit = 250) {
+export async function fetchBookwhenRecords(startUrl = BOOKWHEN_EVENTS_URL, limit = 250) {
   const records: RawSourceRecord[] = [];
-  let nextUrl: string | undefined = BOOKWHEN_EVENTS_URL;
+  let nextUrl: string | undefined = startUrl;
+  let lastUrl: string | undefined;
 
   while (nextUrl && records.length < limit) {
+    lastUrl = nextUrl;
     const response = await fetch(nextUrl, {
       headers: {
         accept: "application/json",
@@ -54,10 +56,11 @@ export async function fetchBookwhenRecords(limit = 250) {
       if (externalId) records.push({ externalId, externalUrl: text(item.url) || undefined, rawPayload: item });
       if (records.length >= limit) break;
     }
-    nextUrl = text(payload.next) || text(payload.nextPage) || undefined;
+    const candidateNext = text(payload.next) || text(payload.nextPage) || undefined;
+    nextUrl = candidateNext && candidateNext !== lastUrl ? candidateNext : undefined;
   }
 
-  return records;
+  return { records, nextUrl: nextUrl ?? BOOKWHEN_EVENTS_URL };
 }
 
 export function normalizeBookwhenRecord(record: RawSourceRecord): NormalizedSession | null {

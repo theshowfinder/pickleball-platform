@@ -15,14 +15,17 @@ async function run(request: Request) {
   const supabase = createSupabaseServerClient();
   if (!supabase) return Response.json({ error: "Server Supabase configuration is missing" }, { status: 500 });
 
-  const { data: connector, error: connectorError } = await supabase.from("source_connectors").select("id").eq("provider", "Bookwhen").eq("source_url", "https://data.bookwhen.com/").maybeSingle();
+  const { data: connector, error: connectorError } = await supabase.from("source_connectors").select("id, config").eq("provider", "Bookwhen").eq("source_url", "https://data.bookwhen.com/").maybeSingle();
   if (connectorError || !connector) return Response.json({ error: connectorError?.message ?? "Bookwhen connector is not configured" }, { status: 500 });
 
   const { data: runRecord, error: runError } = await supabase.from("ingestion_runs").insert({ connector_id: connector.id, status: "running" }).select("id").single();
   if (runError || !runRecord) return Response.json({ error: runError?.message ?? "Could not start ingestion run" }, { status: 500 });
 
   try {
-    const rawRecords = await fetchBookwhenRecords();
+    const connectorConfig = connector.config && typeof connector.config === "object" ? connector.config as Record<string, unknown> : {};
+    const startUrl = typeof connectorConfig.nextUrl === "string" ? connectorConfig.nextUrl : undefined;
+    const fetched = await fetchBookwhenRecords(startUrl);
+    const rawRecords = fetched.records;
     let created = 0;
     let updated = 0;
     for (const rawRecord of rawRecords) {
@@ -61,6 +64,7 @@ async function run(request: Request) {
     }
     await supabase.from("ingestion_runs").update({ status: "succeeded", records_seen: rawRecords.length, records_created: created, records_updated: updated, finished_at: new Date().toISOString() }).eq("id", runRecord.id);
     await supabase.from("source_connectors").update({ last_attempted_at: new Date().toISOString(), last_succeeded_at: new Date().toISOString(), last_error: null }).eq("id", connector.id);
+    await supabase.from("source_connectors").update({ config: { ...connectorConfig, nextUrl: fetched.nextUrl } }).eq("id", connector.id);
     return Response.json({ ok: true, recordsSeen: rawRecords.length, recordsCreated: created, recordsUpdated: updated });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown ingestion error";
