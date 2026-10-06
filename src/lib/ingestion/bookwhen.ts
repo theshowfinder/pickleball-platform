@@ -18,7 +18,13 @@ function firstObject(value: unknown) {
 }
 
 function isPickleball(record: Record<string, unknown>) {
-  return JSON.stringify(record).toLowerCase().includes("pickleball");
+  return JSON.stringify([
+    record.name,
+    record.activity,
+    record.sport,
+    record.category,
+    record.activityType,
+  ]).toLowerCase().includes("pickleball");
 }
 
 function statusFor(spacesRemaining?: number): AvailabilityStatus {

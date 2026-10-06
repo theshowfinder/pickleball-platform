@@ -17,6 +17,16 @@ function statusFor(item: Record<string, unknown>): AvailabilityStatus {
   return "live";
 }
 
+function isPickleball(item: Record<string, unknown>) {
+  return JSON.stringify([
+    item.name,
+    item.activity,
+    item.sport,
+    item.category,
+    item.activityType,
+  ]).toLowerCase().includes("pickleball");
+}
+
 export async function fetchOpenActiveRecords(startUrl = OPENACTIVE_LONDON_SPORT_URL, limit = 250) {
   const records: RawSourceRecord[] = [];
   let nextUrl: string | undefined = startUrl;
@@ -27,7 +37,7 @@ export async function fetchOpenActiveRecords(startUrl = OPENACTIVE_LONDON_SPORT_
     const page = await response.json() as RpdePage;
     for (const item of page.items ?? []) {
       const payload = item.data && typeof item.data === "object" ? item.data : item;
-      if (!JSON.stringify(payload).toLowerCase().includes("pickleball")) continue;
+      if (!isPickleball(payload)) continue;
       const externalId = text(item.id) || text(payload["@id"]);
       if (externalId) records.push({ externalId, externalUrl: text(payload.url) || undefined, rawPayload: payload });
       if (records.length >= limit) break;
