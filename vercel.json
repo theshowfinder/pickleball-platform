@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/ingest/bookwhen",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
