@@ -3,6 +3,10 @@
     {
       "path": "/api/ingest/bookwhen",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/ingest/openactive",
+      "schedule": "15 * * * *"
     }
   ]
 }
